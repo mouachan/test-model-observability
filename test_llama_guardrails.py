@@ -43,13 +43,13 @@ def setup_tracing():
 # Configuration
 LLAMA_STACK_URL = os.getenv(
     "LLAMA_STACK_URL",
-    "http://llama-stack-instance-service.llama-serve.svc.cluster.local:8321"
+    "http://llama-instruct-32-3b-predictor.llama-instruct-32-3b-demo.svc.cluster.local:80"
 )
 LLAMA_GUARD_URL = os.getenv(
     "LLAMA_GUARD_URL",
     "http://llama-guard-3-1b-predictor.llama-serve.svc.cluster.local/v1"
 )
-MODEL_NAME = os.getenv("MODEL_NAME", "meta-llama/Llama-3.2-3B-Instruct")
+MODEL_NAME = os.getenv("MODEL_NAME", "llama-instruct-32-3b")
 
 # Initialiser le tracing
 tracer = setup_tracing()
