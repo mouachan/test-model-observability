@@ -27,6 +27,8 @@ Avant d'exécuter ces tests, vous devez avoir déployé l'infrastructure d'obser
 
 ## 📦 Installation
 
+### Depuis un terminal ou un pod
+
 ```bash
 # Cloner ce dépôt
 git clone https://github.com/mouachan/test-model-observability.git
@@ -35,6 +37,14 @@ cd test-model-observability
 # Installer les dépendances
 pip install -r requirements.txt
 ```
+
+### Depuis Jupyter sur OpenShift
+
+1. **Cloner ou télécharger le dépôt dans votre workspace Jupyter**
+2. **Ouvrir le notebook** `test_multimodal_receipt_jupyter.ipynb`
+3. **Exécuter les cellules** dans l'ordre
+
+Le notebook configure automatiquement l'environnement pour OpenShift et gère l'installation des dépendances.
 
 ## 🧪 Tests disponibles
 
