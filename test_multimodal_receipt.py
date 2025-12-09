@@ -56,16 +56,17 @@ def detect_llama_stack_url():
         return os.getenv("LLAMA_STACK_URL")
     
     # Essayer d'utiliser le playground comme alternative si disponible
-    playground_url = "http://llama-stack-playground.llama-serve.svc.cluster.local"
+    # Le playground est une interface Streamlit, pas une API directe
+    # Utilisons plutôt directement le service interne
+    playground_service = "http://llama-stack-playground.llama-serve.svc.cluster.local"
     try:
-        response = requests.get(f"{playground_url}/health", timeout=5)
+        response = requests.get(f"{playground_service}/", timeout=5)
         if response.status_code == 200:
-            print(f"ℹ️  Utilisation du playground comme alternative: {playground_url}")
-            return playground_url
+            print(f"ℹ️  Playground disponible, mais utilisez plutôt llama-stack-instance pour l'API")
     except:
         pass
     
-    # Sinon, utiliser l'instance par défaut
+    # Utiliser l'instance par défaut (service interne)
     return LLAMA_STACK_URL
 
 # Initialiser le tracing
@@ -175,11 +176,12 @@ Le service n'est pas accessible à l'adresse: {LLAMA_STACK_URL}
 2. Si le pod est en erreur, vérifiez les logs:
    oc describe pod -n llama-serve -l app.kubernetes.io/name=llama-stack-instance
 
-3. Alternative: Utilisez le playground qui fonctionne:
-   export LLAMA_STACK_URL="http://llama-stack-playground.llama-serve.svc.cluster.local/v1"
+3. Alternative: Utilisez directement le service interne (recommandé depuis un pod):
+   export LLAMA_STACK_URL="http://llama-stack-instance-service.llama-serve.svc.cluster.local:8321"
    
-   Ou utilisez la route publique (si vous avez les permissions):
-   export LLAMA_STACK_URL="https://$(oc get route llama-stack-playground -n llama-serve -o jsonpath='{{.spec.host}}')/v1"
+   Ou si llama-stack-instance ne fonctionne pas, utilisez directement vLLM:
+   export LLAMA_STACK_URL="http://llama3-2-3b-predictor.llama-serve.svc.cluster.local:8080"
+   export MODEL_NAME="meta-llama/Llama-3.2-3B-Instruct"
 
 4. Si vous êtes dans un pod, assurez-vous d'être dans le même namespace ou d'utiliser le FQDN complet.
 
