@@ -41,7 +41,9 @@ def setup_tracing():
     return trace.get_tracer(__name__)
 
 # Configuration
-# Par défaut, on essaie d'utiliser llama-stack-instance, mais on peut utiliser le playground en alternative
+# Par défaut, on essaie d'utiliser llama-stack-instance, mais on peut utiliser directement vLLM en alternative
+# Si llama-stack-instance est en erreur, utilisez directement vLLM:
+# export LLAMA_STACK_URL="http://llama3-2-3b-predictor.llama-serve.svc.cluster.local:8080"
 LLAMA_STACK_URL = os.getenv(
     "LLAMA_STACK_URL",
     "http://llama-stack-instance-service.llama-serve.svc.cluster.local:8321"
@@ -55,18 +57,29 @@ def detect_llama_stack_url():
     if os.getenv("LLAMA_STACK_URL"):
         return os.getenv("LLAMA_STACK_URL")
     
-    # Essayer d'utiliser le playground comme alternative si disponible
-    # Le playground est une interface Streamlit, pas une API directe
-    # Utilisons plutôt directement le service interne
-    playground_service = "http://llama-stack-playground.llama-serve.svc.cluster.local"
+    # Essayer d'abord llama-stack-instance
+    instance_url = "http://llama-stack-instance-service.llama-serve.svc.cluster.local:8321"
     try:
-        response = requests.get(f"{playground_service}/", timeout=5)
+        response = requests.get(f"{instance_url}/health", timeout=5)
         if response.status_code == 200:
-            print(f"ℹ️  Playground disponible, mais utilisez plutôt llama-stack-instance pour l'API")
+            return instance_url
     except:
         pass
     
-    # Utiliser l'instance par défaut (service interne)
+    # Si llama-stack-instance n'est pas disponible, essayer directement vLLM
+    vllm_url = "http://llama3-2-3b-predictor.llama-serve.svc.cluster.local:8080"
+    try:
+        response = requests.get(f"{vllm_url}/health", timeout=5)
+        if response.status_code == 200:
+            print(f"ℹ️  llama-stack-instance non disponible, utilisation directe de vLLM: {vllm_url}")
+            return vllm_url
+    except:
+        pass
+    
+    # Par défaut, retourner l'URL configurée (l'utilisateur devra la corriger si nécessaire)
+    print(f"⚠️  Aucun service détecté automatiquement, utilisation de: {LLAMA_STACK_URL}")
+    print(f"💡 Si llama-stack-instance est en erreur, configurez:")
+    print(f"   export LLAMA_STACK_URL=\"http://llama3-2-3b-predictor.llama-serve.svc.cluster.local:8080\"")
     return LLAMA_STACK_URL
 
 # Initialiser le tracing
@@ -176,12 +189,11 @@ Le service n'est pas accessible à l'adresse: {LLAMA_STACK_URL}
 2. Si le pod est en erreur, vérifiez les logs:
    oc describe pod -n llama-serve -l app.kubernetes.io/name=llama-stack-instance
 
-3. Alternative: Utilisez directement le service interne (recommandé depuis un pod):
-   export LLAMA_STACK_URL="http://llama-stack-instance-service.llama-serve.svc.cluster.local:8321"
-   
-   Ou si llama-stack-instance ne fonctionne pas, utilisez directement vLLM:
+3. Alternative: Si llama-stack-instance est en erreur, utilisez directement vLLM:
    export LLAMA_STACK_URL="http://llama3-2-3b-predictor.llama-serve.svc.cluster.local:8080"
    export MODEL_NAME="meta-llama/Llama-3.2-3B-Instruct"
+   
+   Note: vLLM utilise l'API OpenAI-compatible, donc le format des requêtes est identique.
 
 4. Si vous êtes dans un pod, assurez-vous d'être dans le même namespace ou d'utiliser le FQDN complet.
 
