@@ -178,8 +178,8 @@ Le service n'est pas accessible à l'adresse: {LLAMA_STACK_URL}
 3. Alternative: Utilisez le playground qui fonctionne:
    export LLAMA_STACK_URL="http://llama-stack-playground.llama-serve.svc.cluster.local/v1"
    
-   Ou utilisez la route publique:
-   export LLAMA_STACK_URL="https://$(oc get route llama-stack-playground -n llama-serve -o jsonpath='{.spec.host}')/v1"
+   Ou utilisez la route publique (si vous avez les permissions):
+   export LLAMA_STACK_URL="https://$(oc get route llama-stack-playground -n llama-serve -o jsonpath='{{.spec.host}}')/v1"
 
 4. Si vous êtes dans un pod, assurez-vous d'être dans le même namespace ou d'utiliser le FQDN complet.
 
