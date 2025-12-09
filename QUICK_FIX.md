@@ -1,6 +1,10 @@
 # Solution rapide : llama-stack-instance en erreur
 
-Si `llama-stack-instance` est en erreur, vous pouvez utiliser directement vLLM qui expose la même API OpenAI-compatible.
+Si `llama-stack-instance` est en erreur, vous avez plusieurs options :
+
+1. **Utiliser directement vLLM** (si déployé) - API OpenAI-compatible
+2. **Déployer le modèle manquant** - Le problème vient souvent d'un modèle non déployé
+3. **Corriger llama-stack-instance** - Vérifier les logs et corriger la configuration
 
 ## Solution immédiate
 
@@ -22,17 +26,33 @@ os.environ['LLAMA_STACK_URL'] = 'http://llama3-2-3b-predictor.llama-serve.svc.cl
 os.environ['MODEL_NAME'] = 'meta-llama/Llama-3.2-3B-Instruct'
 ```
 
-## Vérifier que vLLM est disponible
+## Vérifier les services disponibles
 
 ```bash
-# Vérifier le service
-oc get svc llama3-2-3b-predictor -n llama-serve
+# Lister tous les InferenceServices
+oc get inferenceservice -n llama-serve
 
-# Vérifier l'InferenceService
-oc get inferenceservice llama3-2-3b -n llama-serve
+# Lister tous les services
+oc get svc -n llama-serve
 
-# Tester la connexion depuis un pod
-curl http://llama3-2-3b-predictor.llama-serve.svc.cluster.local:8080/health
+# Vérifier l'état de llama-stack-instance
+oc get pods -n llama-serve | grep llama-stack-instance
+oc describe pod -n llama-serve -l app.kubernetes.io/name=llama-stack-instance
+```
+
+## Si le modèle vLLM n'est pas déployé
+
+Si vous ne voyez pas `llama3-2-3b` dans les InferenceServices, vous devez le déployer :
+
+```bash
+# Depuis le dépôt lls-observability
+cd lls-observability
+helm install llama3-2-3b ./helm/03-ai-services/llama3.2-3b -n llama-serve \
+  --set model.name="meta-llama/Llama-3.2-3B-Instruct" \
+  --set resources.limits."nvidia\.com/gpu"=1
+
+# Attendre que le modèle soit prêt
+oc wait --for=condition=Ready inferenceservice/llama3-2-3b -n llama-serve --timeout=600s
 ```
 
 ## Pourquoi utiliser vLLM directement ?
