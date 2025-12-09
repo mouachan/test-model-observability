@@ -41,11 +41,32 @@ def setup_tracing():
     return trace.get_tracer(__name__)
 
 # Configuration
+# Par défaut, on essaie d'utiliser llama-stack-instance, mais on peut utiliser le playground en alternative
 LLAMA_STACK_URL = os.getenv(
     "LLAMA_STACK_URL",
     "http://llama-stack-instance-service.llama-serve.svc.cluster.local:8321"
 )
 MODEL_NAME = os.getenv("MODEL_NAME", "meta-llama/Llama-3.2-3B-Instruct")
+
+# Détection automatique de l'environnement
+def detect_llama_stack_url():
+    """Détecte automatiquement l'URL de Llama Stack disponible"""
+    # Si LLAMA_STACK_URL est déjà défini, l'utiliser
+    if os.getenv("LLAMA_STACK_URL"):
+        return os.getenv("LLAMA_STACK_URL")
+    
+    # Essayer d'utiliser le playground comme alternative si disponible
+    playground_url = "http://llama-stack-playground.llama-serve.svc.cluster.local"
+    try:
+        response = requests.get(f"{playground_url}/health", timeout=5)
+        if response.status_code == 200:
+            print(f"ℹ️  Utilisation du playground comme alternative: {playground_url}")
+            return playground_url
+    except:
+        pass
+    
+    # Sinon, utiliser l'instance par défaut
+    return LLAMA_STACK_URL
 
 # Initialiser le tracing
 tracer = setup_tracing()
@@ -121,8 +142,11 @@ Extrais uniquement les informations présentes sur le ticket."""
             # Pour l'instant, on essaie avec le format standard
 
             # Appel à Llama Stack
+            # Utiliser l'URL détectée ou configurée
+            actual_url = detect_llama_stack_url()
+            
             with tracer.start_as_current_span("llama_stack_request") as request_span:
-                request_span.set_attribute("llama_stack_url", LLAMA_STACK_URL)
+                request_span.set_attribute("llama_stack_url", actual_url)
                 request_span.set_attribute("model", MODEL_NAME)
                 
                 payload = {
@@ -132,17 +156,54 @@ Extrais uniquement les informations présentes sur le ticket."""
                     "max_tokens": 2000
                 }
                 
-                response = requests.post(
-                    f"{LLAMA_STACK_URL}/v1/chat/completions",
-                    json=payload,
-                    headers={"Content-Type": "application/json"},
-                    timeout=120
-                )
+                try:
+                    response = requests.post(
+                        f"{actual_url}/v1/chat/completions",
+                        json=payload,
+                        headers={"Content-Type": "application/json"},
+                        timeout=120
+                    )
+                except requests.exceptions.ConnectionError as e:
+                    error_msg = f"""❌ Erreur de connexion à Llama Stack!
+
+Le service n'est pas accessible à l'adresse: {LLAMA_STACK_URL}
+
+🔍 Diagnostic:
+1. Vérifiez que le pod llama-stack-instance est en cours d'exécution:
+   oc get pods -n llama-serve | grep llama-stack-instance
+
+2. Si le pod est en erreur, vérifiez les logs:
+   oc describe pod -n llama-serve -l app.kubernetes.io/name=llama-stack-instance
+
+3. Alternative: Utilisez le playground qui fonctionne:
+   export LLAMA_STACK_URL="http://llama-stack-playground.llama-serve.svc.cluster.local/v1"
+   
+   Ou utilisez la route publique:
+   export LLAMA_STACK_URL="https://$(oc get route llama-stack-playground -n llama-serve -o jsonpath='{.spec.host}')/v1"
+
+4. Si vous êtes dans un pod, assurez-vous d'être dans le même namespace ou d'utiliser le FQDN complet.
+
+Erreur originale: {str(e)}"""
+                    span.set_status(trace.Status(trace.StatusCode.ERROR, error_msg))
+                    request_span.record_exception(e)
+                    raise Exception(error_msg)
+                except requests.exceptions.Timeout as e:
+                    error_msg = f"Timeout lors de la connexion à Llama Stack après 120 secondes. Le service peut être surchargé ou inaccessible."
+                    span.set_status(trace.Status(trace.StatusCode.ERROR, error_msg))
+                    request_span.record_exception(e)
+                    raise Exception(error_msg)
                 
                 request_span.set_attribute("http.status_code", response.status_code)
                 
                 if response.status_code != 200:
-                    error_msg = f"Erreur API: {response.status_code} - {response.text}"
+                    error_msg = f"""❌ Erreur API: {response.status_code}
+
+Réponse du serveur: {response.text[:500]}
+
+Vérifiez:
+- Que le modèle '{MODEL_NAME}' est disponible
+- Que le service Llama Stack est opérationnel
+- Les logs du service: oc logs -n llama-serve -l app.kubernetes.io/name=llama-stack-instance"""
                     span.set_status(trace.Status(trace.StatusCode.ERROR, error_msg))
                     request_span.record_exception(Exception(error_msg))
                     raise Exception(error_msg)
@@ -199,8 +260,12 @@ def main():
         
         main_span.set_attribute("input_image", image_path)
         
+        # Détecter l'URL disponible
+        actual_url = detect_llama_stack_url()
+        main_span.set_attribute("llama_stack_url", actual_url)
+        
         print(f"🔍 Analyse du ticket de caisse: {image_path}")
-        print(f"📡 Connexion à Llama Stack: {LLAMA_STACK_URL}")
+        print(f"📡 Connexion à Llama Stack: {actual_url}")
         print(f"🤖 Modèle: {MODEL_NAME}\n")
         
         try:
