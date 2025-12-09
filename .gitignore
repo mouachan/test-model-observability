@@ -15,6 +15,12 @@ receipt.jpg
 receipt_extraction_result.json
 guardrails_test_results.json
 
+# Images (généralement trop volumineuses pour Git)
+# Décommentez la ligne suivante si vous ne voulez pas commiter les images
+# download/*.jpg
+# download/*.jpeg
+# download/*.png
+
 # IDE
 .vscode/
 .idea/
