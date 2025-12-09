@@ -13,12 +13,12 @@ import requests
 from typing import Dict, List, Any
 
 # Configuration
-# Utilisation directe de vLLM pour avoir la traçabilité complète dans OpenShift
-# vLLM expose une API OpenAI-compatible, donc le format des requêtes est identique
+# Utilisation directe de la route OpenShift du modèle vLLM
+# La route expose une API OpenAI-compatible
 # La traçabilité est automatique via l'instrumentation OpenTelemetry d'OpenShift
-VLLM_URL = os.getenv(
-    "VLLM_URL",
-    "http://llama-instruct-32-3b-predictor.llama-instruct-32-3b-demo.svc.cluster.local:80"
+VLLM_ROUTE_URL = os.getenv(
+    "VLLM_ROUTE_URL",
+    "https://llama-instruct-32-3b-predictor-llama-instruct-32-3b-demo.apps.cluster.example.com"
 )
 MODEL_NAME = os.getenv("MODEL_NAME", "llama-instruct-32-3b")
 
@@ -87,7 +87,7 @@ Extrais uniquement les informations présentes sur le ticket."""
         # on peut décrire l'image ou utiliser OCR préalable
         # Pour l'instant, on essaie avec le format standard
 
-        # Appel direct à vLLM - la traçabilité est automatique via OpenTelemetry dans OpenShift
+        # Appel direct au modèle via la route OpenShift - la traçabilité est automatique
         payload = {
             "model": MODEL_NAME,
             "messages": messages,
@@ -97,28 +97,26 @@ Extrais uniquement les informations présentes sur le ticket."""
         
         try:
             response = requests.post(
-                f"{VLLM_URL}/v1/chat/completions",
+                f"{VLLM_ROUTE_URL}/v1/chat/completions",
                 json=payload,
                 headers={"Content-Type": "application/json"},
-                timeout=120
+                timeout=120,
+                verify=False  # Désactiver la vérification SSL pour les routes internes
             )
         except requests.exceptions.ConnectionError as e:
-            error_msg = f"""❌ Erreur de connexion à vLLM!
+            error_msg = f"""❌ Erreur de connexion au modèle!
 
-Le service n'est pas accessible à l'adresse: {VLLM_URL}
+La route n'est pas accessible à l'adresse: {VLLM_ROUTE_URL}
 
 🔍 Diagnostic:
-1. Vérifiez que le modèle vLLM est déployé:
-   oc get pods -n llama-instruct-32-3b-demo | grep llama-instruct-32-3b
+1. Vérifiez que la route existe:
+   oc get route -n llama-instruct-32-3b-demo | grep llama-instruct-32-3b
 
-2. Si le pod est en erreur, vérifiez les logs:
-   oc logs -n llama-instruct-32-3b-demo -l app=llama-instruct-32-3b-predictor
+2. Obtenez l'URL de la route:
+   oc get route llama-instruct-32-3b-predictor -n llama-instruct-32-3b-demo -o jsonpath='{{.spec.host}}'
 
-3. Vérifiez que le service existe:
-   oc get svc llama-instruct-32-3b-predictor -n llama-instruct-32-3b-demo
-
-4. Configuration recommandée:
-   export VLLM_URL="http://llama-instruct-32-3b-predictor.llama-instruct-32-3b-demo.svc.cluster.local:80"
+3. Configuration recommandée:
+   export VLLM_ROUTE_URL="https://<route-host-from-step-2>"
    export MODEL_NAME="llama-instruct-32-3b"
 
 Erreur originale: {str(e)}"""
@@ -133,9 +131,9 @@ Erreur originale: {str(e)}"""
 Réponse du serveur: {response.text[:500]}
 
 Vérifiez:
-- Que le modèle '{MODEL_NAME}' est disponible dans vLLM
-- Que le service vLLM est opérationnel
-- Les logs du service: oc logs -n llama-instruct-32-3b-demo -l app=llama-instruct-32-3b-predictor"""
+- Que le modèle '{MODEL_NAME}' est disponible
+- Que la route est opérationnelle: oc get route -n llama-instruct-32-3b-demo
+- Les logs du pod: oc logs -n llama-instruct-32-3b-demo -l app=llama-instruct-32-3b-predictor"""
             raise Exception(error_msg)
         
         # Parser la réponse
@@ -180,7 +178,7 @@ def main():
         sys.exit(1)
     
     print(f"🔍 Analyse du ticket de caisse: {image_path}")
-    print(f"📡 Connexion directe à vLLM: {VLLM_URL}")
+    print(f"📡 Connexion au modèle via route OpenShift: {VLLM_ROUTE_URL}")
     print(f"🤖 Modèle: {MODEL_NAME}")
     print(f"📊 Traçabilité automatique via OpenTelemetry dans OpenShift\n")
     
