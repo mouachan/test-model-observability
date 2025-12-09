@@ -27,23 +27,12 @@ Avant d'exécuter ces tests, vous devez avoir déployé l'infrastructure d'obser
 
 ## 📦 Installation
 
-### Option 1: Depuis le dépôt de tests
-
 ```bash
 # Cloner ce dépôt
 git clone https://github.com/mouachan/test-model-observability.git
 cd test-model-observability
 
 # Installer les dépendances
-pip install -r requirements.txt
-```
-
-### Option 2: Depuis le dépôt principal
-
-Si vous avez déjà cloné le dépôt [lls-observability](https://github.com/rh-ai-quickstart/lls-observability), les tests sont disponibles dans le dossier `tests/` :
-
-```bash
-cd lls-observability/tests
 pip install -r requirements.txt
 ```
 
