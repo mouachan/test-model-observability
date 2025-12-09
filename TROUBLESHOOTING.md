@@ -9,13 +9,26 @@ Max retries exceeded with url: /v1/chat/completions
 (Caused by NewConnectionError: Failed to establish a new connection: [Errno 111] Connection refused'))
 ```
 
-### Cause
-Le pod `llama-stack-instance` n'est pas en cours d'exécution. Vérifiez avec:
-```bash
-oc get pods -n llama-serve | grep llama-stack-instance
-```
+### Causes possibles
 
-Si le pod est en état `Init:CreateContainerConfigError` ou `Error`, c'est un problème de déploiement.
+1. **Le pod `llama-stack-instance` n'est pas en cours d'exécution**
+   ```bash
+   oc get pods -n llama-serve | grep llama-stack-instance
+   ```
+   Si le pod est en état `Init:CreateContainerConfigError` ou `Error`, c'est un problème de déploiement.
+
+2. **Le modèle vLLM requis n'est pas déployé**
+   `llama-stack-instance` dépend du modèle `llama3-2-3b`. Vérifiez:
+   ```bash
+   oc get inferenceservice -n llama-serve
+   ```
+   Si `llama3-2-3b` n'est pas dans la liste, vous devez le déployer:
+   ```bash
+   # Depuis le dépôt lls-observability
+   helm install llama3-2-3b ./helm/03-ai-services/llama3.2-3b -n llama-serve \
+     --set model.name="meta-llama/Llama-3.2-3B-Instruct" \
+     --set resources.limits."nvidia\.com/gpu"=1
+   ```
 
 ### Solutions
 
